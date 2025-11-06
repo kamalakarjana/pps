@@ -40,7 +40,7 @@ jobs:
             -backend-config="resource_group_name=rg-lbg-demo-dev" \
             -backend-config="storage_account_name=tfstatestorageacc2b22" \
             -backend-config="container_name=lbg-02-12-1994" \
-            -backend-config="key=terraform.lbg-02-12-1994"
+            -backend-config="key=terraform.tfstate"
         env:
           ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
           ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
@@ -76,8 +76,7 @@ jobs:
             -var="vm_size=Standard_D2s_v3" \
             -var="kubernetes_version=1.33.3" \
             -var="min_count=1" \
-            -var="max_count=5" \
-            -out=tfplan
+            -var="max_count=5"
         env:
           ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
           ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
@@ -89,24 +88,24 @@ jobs:
         run: |
           cd infrastructure
           echo "Applying Terraform plan on branch: ${{ github.ref }}"
-          terraform apply -auto-approve tfplan
+          terraform apply -auto-approve \
+            -var="environment=dev" \
+            -var="resource_group_name=rg-lbg-demo-dev" \
+            -var="location=Central US" \
+            -var="acr_name=${{ env.ACR_NAME }}" \
+            -var="aks_cluster_name=lbg-aks-cluster" \
+            -var="vnet_name=vnet-dev-lbg-app" \
+            -var="public_ip_name=pip-lb-dev-lbg-app" \
+            -var="vm_size=Standard_D2s_v3" \
+            -var="kubernetes_version=1.33.3" \
+            -var="min_count=1" \
+            -var="max_count=5"
           echo "Terraform apply completed successfully"
-          
-          # Get outputs for next jobs
-          terraform output -raw kube_config > kubeconfig
-          echo "KUBECONFIG_FILE=$(pwd)/kubeconfig" >> $GITHUB_ENV
         env:
           ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
           ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
           ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-
-      - name: Upload Kubeconfig
-        uses: actions/upload-artifact@v4
-        with:
-          name: kubeconfig
-          path: infrastructure/kubeconfig
-          retention-days: 1
 
   build-and-push:
     runs-on: ubuntu-latest
@@ -116,12 +115,6 @@ jobs:
         service: [patient-service, appointment-service]
     steps:
       - uses: actions/checkout@v4
-
-      - name: Download Kubeconfig
-        uses: actions/download-artifact@v4
-        with:
-          name: kubeconfig
-          path: /tmp
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -221,17 +214,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download Kubeconfig
-        uses: actions/download-artifact@v4
-        with:
-          name: kubeconfig
-          path: /tmp
-
-      - name: Set Kubeconfig
+      - name: Install Azure CLI
         run: |
-          mkdir -p ~/.kube
-          cp /tmp/kubeconfig ~/.kube/config
-          chmod 600 ~/.kube/config
+          curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
 
       - name: Install Helm
         run: |
@@ -239,6 +224,18 @@ jobs:
           chmod 700 get_helm.sh
           ./get_helm.sh --version v${{ env.HELM_VERSION }}
           helm version
+
+      - name: Configure Azure credentials
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Get AKS credentials
+        run: |
+          az aks get-credentials \
+            --resource-group rg-lbg-demo-dev \
+            --name lbg-aks-cluster-dev \
+            --overwrite-existing
 
       - name: Setup Kubernetes context
         run: |
@@ -279,12 +276,7 @@ jobs:
               echo "No Helm release found. Deleting namespace for clean installation..."
               kubectl delete namespace lbg-ns
               echo "Waiting for namespace to be deleted..."
-              if kubectl wait --for=delete namespace/lbg-ns --timeout=120s 2>/dev/null; then
-                echo "Namespace deleted successfully"
-              else
-                echo "Namespace deletion completed"
-              fi
-              sleep 10
+              sleep 30
             fi
           else
             echo "Namespace lbg-ns does not exist, it will be created"
@@ -307,17 +299,10 @@ jobs:
         run: |
           cd kubernetes/helm
           
-          # Template test first
-          helm template lbg-app . \
-            --namespace lbg-ns \
-            -f values-dev.yml \
-            --set patientService.tag=${{ github.sha }} \
-            --set appointmentService.tag=${{ github.sha }} \
-            --set image.registry=${{ env.ACR_NAME }}.azurecr.io
-          
           # Install/Upgrade the release
           helm upgrade --install lbg-app . \
             --namespace lbg-ns \
+            --create-namespace \
             --wait \
             --timeout 15m \
             -f values-dev.yml \
@@ -334,8 +319,6 @@ jobs:
           kubectl get ingress -n lbg-ns
           echo ""
           kubectl get hpa -n lbg-ns 2>/dev/null || echo "HPA not configured"
-          echo ""
-          kubectl get pvc -n lbg-ns 2>/dev/null || echo "No PVCs found"
 
       - name: Get Browser Access URLs
         run: |
@@ -353,9 +336,6 @@ jobs:
           echo "   Patient Service:    http://lbg-app.dev.local/patients"
           echo "   Appointment Service: http://lbg-app.dev.local/appointments" 
           echo "   Health Check:       http://lbg-app.dev.local/health"
-          echo ""
-          echo "💡 Quick test command:"
-          echo "   echo '$EXTERNAL_IP lbg-app.dev.local' | sudo tee -a /etc/hosts"
 
       - name: Run comprehensive health checks
         run: |
@@ -366,17 +346,7 @@ jobs:
           kubectl wait --for=condition=ready pod -l app=patient-service -n lbg-ns --timeout=300s
           kubectl wait --for=condition=ready pod -l app=appointment-service -n lbg-ns --timeout=300s
           
-          # Test internal health endpoints
-          echo "Testing internal service health..."
-          kubectl exec -n lbg-ns deployment/patient-service -- curl -s -f http://localhost:3000/health && echo "✅ Patient service internal health: OK" || echo "❌ Patient service internal health: FAILED"
-          kubectl exec -n lbg-ns deployment/appointment-service -- curl -s -f http://localhost:3001/health && echo "✅ Appointment service internal health: OK" || echo "❌ Appointment service internal health: FAILED"
-          
-          # Test service-to-service communication
-          echo "Testing service communication..."
-          kubectl exec -n lbg-ns deployment/patient-service -- curl -s -f http://appointment-service:3001/health && echo "✅ Patient -> Appointment communication: OK" || echo "❌ Patient -> Appointment communication: FAILED"
-          kubectl exec -n lbg-ns deployment/appointment-service -- curl -s -f http://patient-service:3000/health && echo "✅ Appointment -> Patient communication: OK" || echo "❌ Appointment -> Patient communication: FAILED"
-          
-          # Test through ingress (if available)
+          # Test through ingress
           echo "Testing through ingress..."
           EXTERNAL_IP=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
           if [ -n "$EXTERNAL_IP" ]; then
