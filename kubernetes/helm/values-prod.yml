@@ -1,0 +1,38 @@
+global:
+  environment: prod
+  namespace: lbg-ns  # ADD THIS LINE
+
+patientService:
+  replicaCount: 4
+  tag: latest
+  serviceType: ClusterIP
+  hpa:
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPU: 50    # ADD THESE TWO LINES
+    targetMemory: 70 # ADD THESE TWO LINES
+
+appointmentService:
+  replicaCount: 4
+  tag: latest
+  serviceType: ClusterIP
+  hpa:
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPU: 50    # ADD THESE TWO LINES
+    targetMemory: 70 # ADD THESE TWO LINES
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  hosts:
+    - host: lbg-app.prod.example.com
+
+persistence:
+  enabled: true
+  size: 10Gi
+  storageClass: "managed-premium"
+

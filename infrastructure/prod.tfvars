@@ -1,0 +1,10 @@
+environment         = "prod"
+resource_group_name = "rg-lbg-demo-dev"
+location            = "Central US"
+acr_name            = "acrlbgdemodev"
+aks_cluster_name    = "lgb-aks-cluster"
+vnet_name           = "vnet-prod-lbg-app"
+public_ip_name      = "lbg-prod-lbg-app"
+node_count          = 4
+vm_size             = "Standard_D4s_v3"
+kubernetes_version  = "1.33.3"

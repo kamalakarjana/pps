@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lbg-app-config
+  namespace: {{ .Values.global.namespace }}
+data:
+  NODE_ENV: {{ .Values.global.environment }}
+  PATIENT_SERVICE_PORT: "{{ .Values.patientService.port }}"
+  APPOINTMENT_SERVICE_PORT: "{{ .Values.appointmentService.port }}"
+  LOG_LEVEL: "info"

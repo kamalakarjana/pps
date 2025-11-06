@@ -1,0 +1,37 @@
+global:
+  environment: staging
+  namespace: lbg-ns  # ADD THIS LINE
+
+patientService:
+  replicaCount: 3
+  tag: latest
+  serviceType: ClusterIP
+  hpa:
+    minReplicas: 2
+    maxReplicas: 8
+    targetCPU: 50    # ADD THESE TWO LINES
+    targetMemory: 70 # ADD THESE TWO LINES
+
+appointmentService:
+  replicaCount: 3
+  tag: latest
+  serviceType: ClusterIP
+  hpa:
+    minReplicas: 2
+    maxReplicas: 8
+    targetCPU: 50    # ADD THESE TWO LINES
+    targetMemory: 70 # ADD THESE TWO LINES
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  hosts:
+    - host: lbg-app.staging.example.com
+
+persistence:
+  enabled: true
+  size: 5Gi
+  storageClass: "managed-premium"
+

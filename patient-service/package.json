@@ -1,0 +1,36 @@
+{
+  "name": "patient-service",
+  "version": "1.0.0",
+  "description": "Patient Microservice for lbg App",
+  "main": "patient-service.js",
+  "scripts": {
+    "start": "node patient-service.js",
+    "dev": "nodemon patient-service.js",
+    "test": "jest --config ../jest.config.js --testPathPattern=\"patient-service/test\"",
+    "test:watch": "jest --config ../jest.config.js --testPathPattern=\"patient-service/test\" --watch",
+    "test:coverage": "jest --config ../jest.config.js --testPathPattern=\"patient-service/test\" --coverage",
+    "sonar": "sonar-scanner"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "jest": "^29.0.0",
+    "supertest": "^6.0.0",
+    "nodemon": "^2.0.0",
+    "coveralls": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "keywords": [
+    "microservice",
+    "lbg",
+    "patient"
+  ],
+  "directories": {
+    "test": "test"
+  },
+  "author": "",
+  "license": "ISC"
+}

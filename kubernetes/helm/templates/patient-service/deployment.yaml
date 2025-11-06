@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.patientService.name }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: {{ .Values.patientService.name }}
+    version: {{ .Values.patientService.tag }}
+    environment: {{ .Values.global.environment }}
+spec:
+  replicas: {{ .Values.patientService.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Values.patientService.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.patientService.name }}
+        version: {{ .Values.patientService.tag }}
+    spec:
+      containers:
+      - name: {{ .Values.patientService.name }}
+        image: "{{ .Values.image.registry }}/{{ .Values.patientService.image }}:{{ .Values.patientService.tag }}"
+        ports:
+        - containerPort: {{ .Values.patientService.port }}
+        env:
+        - name: PORT
+          value: "{{ .Values.patientService.port }}"
+        - name: NODE_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: lbg-app-config
+              key: NODE_ENV
+        resources:
+          requests:
+            memory: {{ .Values.patientService.resources.requests.memory }}
+            cpu: {{ .Values.patientService.resources.requests.cpu }}
+          limits:
+            memory: {{ .Values.patientService.resources.limits.memory }}
+            cpu: {{ .Values.patientService.resources.limits.cpu }}
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: {{ .Values.patientService.port }}
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: {{ .Values.patientService.port }}
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 1
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          allowPrivilegeEscalation: false
+      imagePullSecrets:
+      - name: acr-secret
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
