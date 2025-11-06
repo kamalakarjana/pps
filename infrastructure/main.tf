@@ -27,6 +27,9 @@ provider "azurerm" {
   features {}
 }
 
+# Get current service principal (the one running Terraform)
+data "azurerm_client_config" "current" {}
+
 # Data sources for existing resources
 data "azurerm_resource_group" "existing" {
   name = "rg-lbg-demo-dev"
@@ -40,6 +43,19 @@ data "azurerm_storage_account" "existing" {
 data "azurerm_container_registry" "existing" {
   name                = "acrlbgdemodev2025"
   resource_group_name = data.azurerm_resource_group.existing.name
+}
+
+# Grant required roles to service principal at resource group level
+resource "azurerm_role_assignment" "sp_contributor_rg" {
+  scope                = data.azurerm_resource_group.existing.id
+  principal_id         = data.azurerm_client_config.current.object_id
+  role_definition_name = "Contributor"
+}
+
+resource "azurerm_role_assignment" "sp_user_access_admin_rg" {
+  scope                = data.azurerm_resource_group.existing.id
+  principal_id         = data.azurerm_client_config.current.object_id
+  role_definition_name = "User Access Administrator"
 }
 
 # Network Module - Create new VNet
