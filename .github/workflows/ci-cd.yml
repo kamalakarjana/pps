@@ -121,6 +121,14 @@ jobs:
           cd ${{ matrix.service }}
           npm test || echo "Tests completed with warnings"
 
+      - name: Test application locally
+        run: |
+          cd ${{ matrix.service }}
+          timeout 10s npm start &
+          sleep 5
+          curl -f http://localhost:${{ matrix.service == 'patient-service' && '3000' || '3001' }}/health || echo "Local health check failed but continuing"
+          pkill -f "node"
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -140,9 +148,6 @@ jobs:
           docker build \
             --tag ${{ env.ACR_NAME }}.azurecr.io/${{ matrix.service }}:${{ github.sha }} \
             --tag ${{ env.ACR_NAME }}.azurecr.io/${{ matrix.service }}:latest \
-            --build-arg BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') \
-            --build-arg VCS_REF=${{ github.sha }} \
-            --build-arg VERSION=1.0.0 \
             .
           
           # Push the image
@@ -171,18 +176,8 @@ jobs:
         with:
           image-ref: '${{ env.ACR_NAME }}.azurecr.io/${{ matrix.service }}:${{ github.sha }}'
           format: 'table'
-          severity: 'CRITICAL'  # Only fail on CRITICAL, allow HIGH
+          severity: 'CRITICAL'
           exit-code: 1
-
-      - name: Upload Trivy results as artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: trivy-results-${{ matrix.service }}
-          path: |
-            trivy-results-*.json
-            trivy-results-*.sarif
-          retention-days: 30
 
   security-scan:
     runs-on: ubuntu-latest
@@ -235,14 +230,8 @@ jobs:
       - name: Get ACR Admin Credentials
         id: get_acr_credentials
         run: |
-          # Get ACR admin credentials
           ACR_USERNAME=$(az acr credential show --name ${{ env.ACR_NAME }} --query "username" -o tsv)
           ACR_PASSWORD=$(az acr credential show --name ${{ env.ACR_NAME }} --query "passwords[0].value" -o tsv)
-          
-          echo "ACR Username: $ACR_USERNAME"
-          echo "ACR Password: ***"  # Don't print password
-          
-          # Set outputs for later steps
           echo "acr_username=$ACR_USERNAME" >> $GITHUB_OUTPUT
           echo "acr_password=$ACR_PASSWORD" >> $GITHUB_OUTPUT
 
@@ -270,24 +259,13 @@ jobs:
       - name: Comprehensive namespace management
         run: |
           echo "=== Namespace Management ==="
-          
-          # Force delete any existing namespace
-          echo "Cleaning up existing namespace..."
           kubectl delete namespace lbg-ns --force --grace-period=0 --ignore-not-found=true || true
           sleep 30
-          
-          # Create namespace manually
-          echo "Creating namespace lbg-ns..."
           kubectl create namespace lbg-ns
-          
-          # Verify namespace creation
-          echo "Verifying namespace..."
           kubectl get namespace lbg-ns
-          echo "✅ Namespace lbg-ns ready"
 
       - name: Create ACR pull secret
         run: |
-          # Create ACR secret after namespace is created
           kubectl create secret docker-registry acr-secret \
             --namespace lbg-ns \
             --docker-server=${{ env.ACR_NAME }}.azurecr.io \
@@ -309,7 +287,7 @@ jobs:
             --set appointmentService.tag=${{ github.sha }} \
             --set image.registry=${{ env.ACR_NAME }}.azurecr.io
           
-          # Install/Upgrade WITHOUT --create-namespace (namespace is already created)
+          # Install/Upgrade
           helm upgrade --install lbg-app . \
             --namespace lbg-ns \
             --wait \
@@ -326,10 +304,7 @@ jobs:
         run: |
           echo "=== Deployment Verification ==="
           kubectl get all -n lbg-ns
-          echo ""
           kubectl get ingress -n lbg-ns
-          echo ""
-          kubectl get hpa -n lbg-ns 2>/dev/null || echo "HPA not configured"
 
       - name: Get Browser Access URLs
         run: |
@@ -344,10 +319,9 @@ jobs:
           echo "$EXTERNAL_IP lbg-app.dev.local"
           echo ""
           echo "🌐 Access your services in browser:"
-          echo "   Patient Service:        http://lbg-app.dev.local/patient-service/"
-          echo "   Appointment Service:    http://lbg-app.dev.local/appointment-service/"
-          echo "   Patient Health:         http://lbg-app.dev.local/patient-service/health"
-          echo "   Appointment Health:     http://lbg-app.dev.local/appointment-service/health"
+          echo "   Patient Service:    http://lbg-app.dev.local/"
+          echo "   Appointment Service: http://lbg-app.dev.local/appointments"
+          echo "   Health Check:       http://lbg-app.dev.local/health"
 
       - name: Run comprehensive health checks
         run: |
@@ -362,44 +336,33 @@ jobs:
           EXTERNAL_IP=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
           echo "External IP: $EXTERNAL_IP"
           
-          # Wait for ingress to be fully ready
-          echo "Waiting for ingress configuration..."
+          # Wait for ingress
           sleep 30
           
-          # Test with the correct paths (from nginx config)
-          echo "=== Testing with Correct Paths ==="
+          # Test applications inside pods first
+          echo "Testing applications inside pods..."
+          kubectl exec -n lbg-ns deployment/patient-service -- curl -s http://localhost:3000/health && echo "✅ Patient service internal: OK" || echo "❌ Patient service internal: FAILED"
+          kubectl exec -n lbg-ns deployment/appointment-service -- curl -s http://localhost:3001/health && echo "✅ Appointment service internal: OK" || echo "❌ Appointment service internal: FAILED"
           
-          # Test patient-service health
-          if curl -s -f -m 10 -H "Host: lbg-app.dev.local" http://$EXTERNAL_IP/patient-service/health; then
-            echo "✅ Patient service health check: SUCCESS"
+          # Test through ingress
+          echo "Testing through ingress..."
+          if curl -s -f -m 10 -H "Host: lbg-app.dev.local" http://$EXTERNAL_IP/health; then
+            echo "✅ Health check: SUCCESS"
           else
-            echo "❌ Patient service health check: FAILED"
+            echo "❌ Health check: FAILED"
           fi
           
-          # Test appointment-service health  
-          if curl -s -f -m 10 -H "Host: lbg-app.dev.local" http://$EXTERNAL_IP/appointment-service/health; then
-            echo "✅ Appointment service health check: SUCCESS"
+          if curl -s -f -m 10 -H "Host: lbg-app.dev.local" http://$EXTERNAL_IP/; then
+            echo "✅ Root endpoint: SUCCESS"
           else
-            echo "❌ Appointment service health check: FAILED"
+            echo "❌ Root endpoint: FAILED"
           fi
           
-          # Test patient service main endpoint
-          if curl -s -f -m 10 -H "Host: lbg-app.dev.local" http://$EXTERNAL_IP/patient-service/; then
-            echo "✅ Patient service main endpoint: SUCCESS"
+          if curl -s -f -m 10 -H "Host: lbg-app.dev.local" http://$EXTERNAL_IP/appointments; then
+            echo "✅ Appointments endpoint: SUCCESS"
           else
-            echo "❌ Patient service main endpoint: FAILED"
+            echo "❌ Appointments endpoint: FAILED"
           fi
-          
-          # Test appointment service main endpoint
-          if curl -s -f -m 10 -H "Host: lbg-app.dev.local" http://$EXTERNAL_IP/appointment-service/; then
-            echo "✅ Appointment service main endpoint: SUCCESS"
-          else
-            echo "❌ Appointment service main endpoint: FAILED"
-          fi
-          
-          # Final status
-          echo "=== Final Status ==="
-          kubectl get all -n lbg-ns
 
   cleanup:
     runs-on: ubuntu-latest

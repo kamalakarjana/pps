@@ -3,13 +3,8 @@ global:
   environment: dev
   
 image:
-  registry: acrlbgdemodev.azurecr.io
+  registry: acrlbgdemodev2025.azurecr.io
   pullPolicy: IfNotPresent
-
-persistence:
-  enabled: false
-  size: 1Gi
-  storageClass: "default"
 
 patientService:
   name: patient-service
@@ -26,8 +21,8 @@ patientService:
       memory: "128Mi"
       cpu: "100m"
   hpa:
-    minReplicas: 2
-    maxReplicas: 10
+    minReplicas: 1
+    maxReplicas: 5
     targetCPU: 50
     targetMemory: 70
 
@@ -46,8 +41,8 @@ appointmentService:
       memory: "128Mi"
       cpu: "100m"
   hpa:
-    minReplicas: 2
-    maxReplicas: 10
+    minReplicas: 1
+    maxReplicas: 5
     targetCPU: 50
     targetMemory: 70
 
@@ -60,9 +55,12 @@ ingress:
   hosts:
     - host: lbg-app.dev.local
       paths:
+        - path: /
+          pathType: Prefix
         - path: /patients
           pathType: Prefix
         - path: /appointments
           pathType: Prefix
-        - path: /health
-          pathType: Prefix
+
+persistence:
+  enabled: false

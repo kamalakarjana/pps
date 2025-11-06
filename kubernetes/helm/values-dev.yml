@@ -2,6 +2,10 @@ global:
   environment: dev
   namespace: lbg-ns
 
+image:
+  registry: acrlbgdemodev2025.azurecr.io
+  pullPolicy: IfNotPresent
+
 patientService:
   name: patient-service
   replicaCount: 2
@@ -46,28 +50,20 @@ ingress:
   enabled: true
   className: "nginx"
   annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "false"
     nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
     nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "30"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "30"
   hosts:
     - host: lbg-app.dev.local
       paths:
+        - path: /
+          pathType: Prefix
         - path: /patients
           pathType: Prefix
         - path: /appointments
           pathType: Prefix
-        - path: /health
-          pathType: Prefix
-        - path: /
-          pathType: Prefix
 
 persistence:
   enabled: false
-  size: 1Gi
-  storageClass: "default"
-
-image:
-  registry: acrlbgdemodev2025.azurecr.io
-  pullPolicy: IfNotPresent
