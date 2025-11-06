@@ -2,9 +2,9 @@ name: lbg App CI/CD
 
 on:
   push:
-    branches: [main, qwert]
+    branches: [main, pps-sat]
   pull_request:
-    branches: [main]
+    branches: [main, pps-sat]
 
 env:
   ACR_NAME: "acrlbgdemodev2025"
@@ -85,7 +85,7 @@ jobs:
           ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
 
       - name: Terraform Apply
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/qwert'
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/pps-sat'
         run: |
           cd infrastructure
           echo "Applying Terraform plan on branch: ${{ github.ref }}"
@@ -344,9 +344,10 @@ jobs:
           echo "$EXTERNAL_IP lbg-app.dev.local"
           echo ""
           echo "🌐 Access your services in browser:"
-          echo "   Patient Service:    http://lbg-app.dev.local/patients"
-          echo "   Appointment Service: http://lbg-app.dev.local/appointments" 
-          echo "   Health Check:       http://lbg-app.dev.local/health"
+          echo "   Patient Service:        http://lbg-app.dev.local/patient-service/"
+          echo "   Appointment Service:    http://lbg-app.dev.local/appointment-service/"
+          echo "   Patient Health:         http://lbg-app.dev.local/patient-service/health"
+          echo "   Appointment Health:     http://lbg-app.dev.local/appointment-service/health"
 
       - name: Run comprehensive health checks
         run: |
@@ -357,12 +358,48 @@ jobs:
           kubectl wait --for=condition=ready pod -l app=patient-service -n lbg-ns --timeout=300s
           kubectl wait --for=condition=ready pod -l app=appointment-service -n lbg-ns --timeout=300s
           
-          # Test through ingress
-          echo "Testing through ingress..."
+          # Get external IP
           EXTERNAL_IP=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-          if [ -n "$EXTERNAL_IP" ]; then
-            curl -s -f http://$EXTERNAL_IP/health && echo "✅ Ingress health check: OK" || echo "❌ Ingress health check: FAILED"
+          echo "External IP: $EXTERNAL_IP"
+          
+          # Wait for ingress to be fully ready
+          echo "Waiting for ingress configuration..."
+          sleep 30
+          
+          # Test with the correct paths (from nginx config)
+          echo "=== Testing with Correct Paths ==="
+          
+          # Test patient-service health
+          if curl -s -f -m 10 -H "Host: lbg-app.dev.local" http://$EXTERNAL_IP/patient-service/health; then
+            echo "✅ Patient service health check: SUCCESS"
+          else
+            echo "❌ Patient service health check: FAILED"
           fi
+          
+          # Test appointment-service health  
+          if curl -s -f -m 10 -H "Host: lbg-app.dev.local" http://$EXTERNAL_IP/appointment-service/health; then
+            echo "✅ Appointment service health check: SUCCESS"
+          else
+            echo "❌ Appointment service health check: FAILED"
+          fi
+          
+          # Test patient service main endpoint
+          if curl -s -f -m 10 -H "Host: lbg-app.dev.local" http://$EXTERNAL_IP/patient-service/; then
+            echo "✅ Patient service main endpoint: SUCCESS"
+          else
+            echo "❌ Patient service main endpoint: FAILED"
+          fi
+          
+          # Test appointment service main endpoint
+          if curl -s -f -m 10 -H "Host: lbg-app.dev.local" http://$EXTERNAL_IP/appointment-service/; then
+            echo "✅ Appointment service main endpoint: SUCCESS"
+          else
+            echo "❌ Appointment service main endpoint: FAILED"
+          fi
+          
+          # Final status
+          echo "=== Final Status ==="
+          kubectl get all -n lbg-ns
 
   cleanup:
     runs-on: ubuntu-latest

@@ -71,5 +71,3 @@ persistence:
 image:
   registry: acrlbgdemodev2025.azurecr.io
   pullPolicy: IfNotPresent
-  credentials:
-    secretName: acrlbgdemodev2025-secret
