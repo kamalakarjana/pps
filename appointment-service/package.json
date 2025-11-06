@@ -16,9 +16,8 @@
   },
   "devDependencies": {
     "jest": "^29.0.0",
-    "supertest": "^6.0.0",
-    "nodemon": "^2.0.0",
-    "coveralls": "^3.0.0"
+    "nodemon": "^3.1.10",
+    "supertest": "^6.0.0"
   },
   "engines": {
     "node": ">=14.0.0"
