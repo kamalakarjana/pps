@@ -97,6 +97,41 @@ jobs:
           ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
 
+      - name: Assign ACR Pull Role to AKS
+        run: |
+          echo "Assigning ACR Pull role to AKS cluster..."
+          
+          # Get AKS cluster identity
+          AKS_IDENTITY=$(az aks show \
+            --name lbg-aks-cluster-dev \
+            --resource-group rg-lbg-demo-dev \
+            --query identity.principalId -o tsv)
+          
+          echo "AKS Identity: $AKS_IDENTITY"
+          
+          # Check if role assignment already exists
+          EXISTING_ASSIGNMENT=$(az role assignment list \
+            --assignee $AKS_IDENTITY \
+            --role "AcrPull" \
+            --scope "/subscriptions/$AZURE_SUBSCRIPTION_ID/resourceGroups/rg-lbg-demo-dev/providers/Microsoft.ContainerRegistry/registries/$ACR_NAME" \
+            --query "[].id" -o tsv)
+          
+          if [ -n "$EXISTING_ASSIGNMENT" ]; then
+            echo "✅ ACR Pull role already assigned to AKS cluster"
+          else
+            echo "Assigning ACR Pull role to AKS cluster..."
+            az role assignment create \
+              --assignee $AKS_IDENTITY \
+              --role "AcrPull" \
+              --scope "/subscriptions/$AZURE_SUBSCRIPTION_ID/resourceGroups/rg-lbg-demo-dev/providers/Microsoft.ContainerRegistry/registries/$ACR_NAME"
+            echo "✅ ACR Pull role assigned successfully to AKS cluster"
+          fi
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+
   build-and-push:
     runs-on: ubuntu-latest
     needs: Build-terraform-infrastructure

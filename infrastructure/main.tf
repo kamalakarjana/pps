@@ -81,7 +81,6 @@ resource "azurerm_kubernetes_cluster" "main" {
 
   default_node_pool {
     name                = "default"
-    # Remove node_count when enable_auto_scaling is true
     vm_size             = var.vm_size
     vnet_subnet_id      = azurerm_subnet.aks.id
     type                = "VirtualMachineScaleSets"
@@ -122,13 +121,7 @@ resource "azurerm_public_ip" "pip" {
   }
 }
 
-# Assign AKS the role to pull from ACR
-resource "azurerm_role_assignment" "aks_acr" {
-  principal_id                     = azurerm_kubernetes_cluster.main.kubelet_identity[0].object_id
-  role_definition_name             = "AcrPull"
-  scope                            = azurerm_container_registry.main.id
-  skip_service_principal_aad_check = true
-}
+# Note: ACR role assignment is handled in the pipeline due to permission constraints
 
 # Kubernetes Provider
 provider "kubernetes" {
