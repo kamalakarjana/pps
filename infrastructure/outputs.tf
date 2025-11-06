@@ -1,42 +1,36 @@
-# Outputs for existing resources
 output "resource_group_name" {
-  value = data.azurerm_resource_group.existing.name
-}
-
-output "storage_account_name" {
-  value = data.azurerm_storage_account.existing.name
+  value = azurerm_resource_group.main.name
 }
 
 output "acr_login_server" {
-  value = data.azurerm_container_registry.existing.login_server
+  value = azurerm_container_registry.main.login_server
 }
 
 output "acr_admin_username" {
-  value = data.azurerm_container_registry.existing.admin_username
+  value = azurerm_container_registry.main.admin_username
 }
 
-output "public_ip_address" {
-  value = data.azurerm_public_ip.existing.ip_address
-}
-
-output "vnet_id" {
-  value = data.azurerm_virtual_network.existing.id
-}
-
-output "subnet_id" {
-  value = data.azurerm_subnet.existing.id
-}
-
-# Outputs for created resources
 output "aks_cluster_name" {
-  value = module.aks.name
+  value = azurerm_kubernetes_cluster.main.name
 }
 
 output "aks_cluster_id" {
-  value = module.aks.id
+  value = azurerm_kubernetes_cluster.main.id
+}
+
+output "public_ip_address" {
+  value = azurerm_public_ip.pip.ip_address
+}
+
+output "vnet_id" {
+  value = azurerm_virtual_network.main.id
+}
+
+output "subnet_id" {
+  value = azurerm_subnet.aks.id
 }
 
 output "kube_config" {
-  value     = module.aks.kube_config
+  value     = azurerm_kubernetes_cluster.main.kube_config_raw
   sensitive = true
 }

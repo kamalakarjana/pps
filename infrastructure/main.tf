@@ -28,74 +28,122 @@ provider "azurerm" {
   features {}
 }
 
-# Get current service principal (the one running Terraform)
-data "azurerm_client_config" "current" {}
+# Resource Group
+resource "azurerm_resource_group" "main" {
+  name     = var.resource_group_name
+  location = var.location
 
-# Data sources for existing resources
-data "azurerm_resource_group" "existing" {
-  name = "rg-lbg-demo-dev"
+  tags = {
+    environment = var.environment
+  }
 }
 
-data "azurerm_storage_account" "existing" {
-  name                = "tfstatestorageacc2b22"
-  resource_group_name = data.azurerm_resource_group.existing.name
+# Container Registry
+resource "azurerm_container_registry" "main" {
+  name                = var.acr_name
+  resource_group_name = azurerm_resource_group.main.name
+  location            = azurerm_resource_group.main.location
+  sku                 = "Standard"
+  admin_enabled       = true
+
+  tags = {
+    environment = var.environment
+  }
 }
 
-data "azurerm_container_registry" "existing" {
-  name                = "acrlbgdemodev2025"
-  resource_group_name = data.azurerm_resource_group.existing.name
+# Virtual Network
+resource "azurerm_virtual_network" "main" {
+  name                = var.vnet_name
+  address_space       = ["10.0.0.0/16"]
+  location            = azurerm_resource_group.main.location
+  resource_group_name = azurerm_resource_group.main.name
+
+  tags = {
+    environment = var.environment
+  }
 }
 
-# Data source for existing Public IP
-data "azurerm_public_ip" "existing" {
-  name                = "pip-lb-dev-lbg-app"
-  resource_group_name = data.azurerm_resource_group.existing.name
-}
-
-# Data source for existing VNet
-data "azurerm_virtual_network" "existing" {
-  name                = "vnet-dev-lbg-app"
-  resource_group_name = data.azurerm_resource_group.existing.name
-}
-
-# Data source for existing Subnet
-data "azurerm_subnet" "existing" {
+# Subnet for AKS
+resource "azurerm_subnet" "aks" {
   name                 = "aks-subnet"
-  virtual_network_name = data.azurerm_virtual_network.existing.name
-  resource_group_name  = data.azurerm_resource_group.existing.name
+  resource_group_name  = azurerm_resource_group.main.name
+  virtual_network_name = azurerm_virtual_network.main.name
+  address_prefixes     = ["10.0.1.0/24"]
 }
 
-# AKS Cluster Module - Create new cluster
-module "aks" {
-  source = "./modules/aks"
-
-  resource_group_name = data.azurerm_resource_group.existing.name
-  location            = data.azurerm_resource_group.existing.location
-  aks_cluster_name    = var.aks_cluster_name
-  vnet_id             = data.azurerm_virtual_network.existing.id
-  subnet_id           = data.azurerm_subnet.existing.id
-  acr_id              = data.azurerm_container_registry.existing.id
-  environment         = var.environment
-  vm_size             = var.vm_size
+# AKS Cluster
+resource "azurerm_kubernetes_cluster" "main" {
+  name                = "${var.aks_cluster_name}-${var.environment}"
+  location            = azurerm_resource_group.main.location
+  resource_group_name = azurerm_resource_group.main.name
+  dns_prefix          = "${var.aks_cluster_name}-${var.environment}"
   kubernetes_version  = var.kubernetes_version
-  min_count           = var.min_count
-  max_count           = var.max_count
+
+  default_node_pool {
+    name                = "default"
+    node_count          = 2
+    vm_size             = var.vm_size
+    vnet_subnet_id      = azurerm_subnet.aks.id
+    type                = "VirtualMachineScaleSets"
+    enable_auto_scaling = true
+    min_count           = var.min_count
+    max_count           = var.max_count
+  }
+
+  identity {
+    type = "SystemAssigned"
+  }
+
+  network_profile {
+    network_plugin = "azure"
+    network_policy = "azure"
+    service_cidr   = "10.0.2.0/24"
+    dns_service_ip = "10.0.2.10"
+  }
+
+  role_based_access_control_enabled = true
+
+  tags = {
+    environment = var.environment
+  }
+}
+
+# Public IP for Load Balancer
+resource "azurerm_public_ip" "pip" {
+  name                = var.public_ip_name
+  location            = azurerm_resource_group.main.location
+  resource_group_name = azurerm_resource_group.main.name
+  allocation_method   = "Static"
+  sku                 = "Standard"
+  domain_name_label   = "${var.environment}-lbg-app"
+
+  tags = {
+    environment = var.environment
+  }
+}
+
+# Assign AKS the role to pull from ACR
+resource "azurerm_role_assignment" "aks_acr" {
+  principal_id                     = azurerm_kubernetes_cluster.main.kubelet_identity[0].object_id
+  role_definition_name             = "AcrPull"
+  scope                            = azurerm_container_registry.main.id
+  skip_service_principal_aad_check = true
 }
 
 # Kubernetes Provider
 provider "kubernetes" {
-  host                   = module.aks.host
-  client_certificate     = base64decode(module.aks.client_certificate)
-  client_key             = base64decode(module.aks.client_key)
-  cluster_ca_certificate = base64decode(module.aks.cluster_ca_certificate)
+  host                   = azurerm_kubernetes_cluster.main.kube_config.0.host
+  client_certificate     = base64decode(azurerm_kubernetes_cluster.main.kube_config.0.client_certificate)
+  client_key             = base64decode(azurerm_kubernetes_cluster.main.kube_config.0.client_key)
+  cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.main.kube_config.0.cluster_ca_certificate)
 }
 
 # Helm Provider
 provider "helm" {
   kubernetes {
-    host                   = module.aks.host
-    client_certificate     = base64decode(module.aks.client_certificate)
-    client_key             = base64decode(module.aks.client_key)
-    cluster_ca_certificate = base64decode(module.aks.cluster_ca_certificate)
+    host                   = azurerm_kubernetes_cluster.main.kube_config.0.host
+    client_certificate     = base64decode(azurerm_kubernetes_cluster.main.kube_config.0.client_certificate)
+    client_key             = base64decode(azurerm_kubernetes_cluster.main.kube_config.0.client_key)
+    cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.main.kube_config.0.cluster_ca_certificate)
   }
 }
