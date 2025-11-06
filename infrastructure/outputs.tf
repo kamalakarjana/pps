@@ -15,6 +15,18 @@ output "acr_admin_username" {
   value = data.azurerm_container_registry.existing.admin_username
 }
 
+output "public_ip_address" {
+  value = data.azurerm_public_ip.existing.ip_address
+}
+
+output "vnet_id" {
+  value = data.azurerm_virtual_network.existing.id
+}
+
+output "subnet_id" {
+  value = data.azurerm_subnet.existing.id
+}
+
 # Outputs for created resources
 output "aks_cluster_name" {
   value = module.aks.name
@@ -22,18 +34,6 @@ output "aks_cluster_name" {
 
 output "aks_cluster_id" {
   value = module.aks.id
-}
-
-output "public_ip_address" {
-  value = azurerm_public_ip.pip.ip_address
-}
-
-output "vnet_id" {
-  value = module.network.vnet_id
-}
-
-output "subnet_id" {
-  value = module.network.aks_subnet_id
 }
 
 output "kube_config" {
