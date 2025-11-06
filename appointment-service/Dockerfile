@@ -1,8 +1,8 @@
-# ❌ CURRENT (VULNERABLE)
-# FROM node:14-alpine
+# ❌ CURRENT (EOL)
+# FROM node:18-alpine3.18
 
-# ✅ FIXED VERSION
-FROM node:18-alpine3.18
+# ✅ FIXED (Latest stable)
+FROM node:18-alpine3.20
 
 WORKDIR /app
 
@@ -15,5 +15,4 @@ EXPOSE 3001
 
 USER node
 
-# ✅ FIX: Correct the startup file name
 CMD [ "node", "appointment-service.js" ]
