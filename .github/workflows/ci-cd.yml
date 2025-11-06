@@ -97,41 +97,6 @@ jobs:
           ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
 
-      - name: Assign ACR Pull Role to AKS
-        run: |
-          echo "Assigning ACR Pull role to AKS cluster..."
-          
-          # Get AKS cluster identity
-          AKS_IDENTITY=$(az aks show \
-            --name lbg-aks-cluster-dev \
-            --resource-group rg-lbg-demo-dev \
-            --query identity.principalId -o tsv)
-          
-          echo "AKS Identity: $AKS_IDENTITY"
-          
-          # Check if role assignment already exists
-          EXISTING_ASSIGNMENT=$(az role assignment list \
-            --assignee $AKS_IDENTITY \
-            --role "AcrPull" \
-            --scope "/subscriptions/$AZURE_SUBSCRIPTION_ID/resourceGroups/rg-lbg-demo-dev/providers/Microsoft.ContainerRegistry/registries/$ACR_NAME" \
-            --query "[].id" -o tsv)
-          
-          if [ -n "$EXISTING_ASSIGNMENT" ]; then
-            echo "✅ ACR Pull role already assigned to AKS cluster"
-          else
-            echo "Assigning ACR Pull role to AKS cluster..."
-            az role assignment create \
-              --assignee $AKS_IDENTITY \
-              --role "AcrPull" \
-              --scope "/subscriptions/$AZURE_SUBSCRIPTION_ID/resourceGroups/rg-lbg-demo-dev/providers/Microsoft.ContainerRegistry/registries/$ACR_NAME"
-            echo "✅ ACR Pull role assigned successfully to AKS cluster"
-          fi
-        env:
-          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
-          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-
   build-and-push:
     runs-on: ubuntu-latest
     needs: Build-terraform-infrastructure
@@ -267,6 +232,20 @@ jobs:
           kubectl config current-context
           kubectl get nodes
 
+      - name: Get ACR Admin Credentials
+        id: get_acr_credentials
+        run: |
+          # Get ACR admin credentials
+          ACR_USERNAME=$(az acr credential show --name ${{ env.ACR_NAME }} --query "username" -o tsv)
+          ACR_PASSWORD=$(az acr credential show --name ${{ env.ACR_NAME }} --query "passwords[0].value" -o tsv)
+          
+          echo "ACR Username: $ACR_USERNAME"
+          echo "ACR Password: ***"  # Don't print password
+          
+          # Set outputs for later steps
+          echo "acr_username=$ACR_USERNAME" >> $GITHUB_OUTPUT
+          echo "acr_password=$ACR_PASSWORD" >> $GITHUB_OUTPUT
+
       - name: Install Nginx Ingress Controller
         run: |
           helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
@@ -307,17 +286,17 @@ jobs:
             echo "Namespace lbg-ns does not exist, it will be created"
           fi
 
-      - name: Create ACR pull secret
+      - name: Create ACR pull secret using admin credentials
         run: |
           # Ensure namespace exists
           kubectl create namespace lbg-ns --dry-run=client -o yaml | kubectl apply -f -
           
-          # Create or update ACR secret
+          # Create or update ACR secret using admin credentials
           kubectl create secret docker-registry acr-secret \
             --namespace lbg-ns \
             --docker-server=${{ env.ACR_NAME }}.azurecr.io \
-            --docker-username=${{ secrets.AZURE_CLIENT_ID }} \
-            --docker-password=${{ secrets.AZURE_CLIENT_SECRET }} \
+            --docker-username=${{ steps.get_acr_credentials.outputs.acr_username }} \
+            --docker-password=${{ steps.get_acr_credentials.outputs.acr_password }} \
             --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Deploy to AKS using Helm
