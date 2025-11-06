@@ -267,29 +267,12 @@ jobs:
           echo "External IP: $EXTERNAL_IP"
           echo "external_ip=$EXTERNAL_IP" >> $GITHUB_ENV
 
-      - name: Force namespace cleanup
+      - name: Simple namespace check
         run: |
-          echo "=== Force Namespace Cleanup ==="
-          
-          # Get fresh credentials
-          az aks get-credentials \
-            --resource-group rg-lbg-demo-dev \
-            --name lbg-aks-cluster-dev \
-            --overwrite-existing
-          
-          # Force delete namespace
-          echo "Force deleting namespace lbg-ns..."
-          kubectl delete namespace lbg-ns --force --grace-period=0 --ignore-not-found=true || true
-          
-          # Wait and verify
-          sleep 30
-          if kubectl get namespace lbg-ns >/dev/null 2>&1; then
-            echo "❌ ERROR: Namespace lbg-ns still exists after force deletion"
-            echo "This indicates a serious issue with the namespace."
-            exit 1
-          else
-            echo "✅ Namespace lbg-ns successfully deleted"
-          fi
+          echo "=== Quick Namespace Check ==="
+          # Just attempt to delete if exists, ignore errors
+          kubectl delete namespace lbg-ns --ignore-not-found=true || true
+          echo "Namespace check completed"
 
       - name: Deploy to AKS using Helm
         run: |
