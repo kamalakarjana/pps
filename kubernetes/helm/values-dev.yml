@@ -68,3 +68,8 @@ persistence:
   size: 1Gi
   storageClass: "default"
 
+image:
+  registry: acrlbgdemodev2025.azurecr.io
+  pullPolicy: IfNotPresent
+  credentials:
+    secretName: acrlbgdemodev2025-secret
