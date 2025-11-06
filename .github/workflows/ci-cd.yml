@@ -271,33 +271,19 @@ jobs:
         run: |
           # Check if namespace exists
           if kubectl get namespace lbg-ns >/dev/null 2>&1; then
-            echo "Namespace lbg-ns already exists"
-            
-            # Check if there's a Helm release in this namespace
-            if helm list -n lbg-ns -q | grep -q "lbg-app"; then
-              echo "Helm release 'lbg-app' exists, will perform upgrade"
-            else
-              echo "No Helm release found. Deleting namespace for clean installation..."
-              kubectl delete namespace lbg-ns
-              echo "Waiting for namespace to be deleted..."
-              sleep 30
-            fi
+            echo "Namespace lbg-ns exists, deleting for clean installation..."
+            kubectl delete namespace lbg-ns
+            echo "Waiting for namespace to be deleted..."
+            sleep 30
+            # Verify deletion
+            until ! kubectl get namespace lbg-ns >/dev/null 2>&1; do
+              echo "Waiting for namespace deletion to complete..."
+              sleep 10
+            done
+            echo "Namespace lbg-ns successfully deleted"
           else
-            echo "Namespace lbg-ns does not exist, it will be created"
+            echo "Namespace lbg-ns does not exist, it will be created by Helm"
           fi
-
-      - name: Create ACR pull secret using admin credentials
-        run: |
-          # Ensure namespace exists
-          kubectl create namespace lbg-ns --dry-run=client -o yaml | kubectl apply -f -
-          
-          # Create or update ACR secret using admin credentials
-          kubectl create secret docker-registry acr-secret \
-            --namespace lbg-ns \
-            --docker-server=${{ env.ACR_NAME }}.azurecr.io \
-            --docker-username=${{ steps.get_acr_credentials.outputs.acr_username }} \
-            --docker-password=${{ steps.get_acr_credentials.outputs.acr_password }} \
-            --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Deploy to AKS using Helm
         run: |
