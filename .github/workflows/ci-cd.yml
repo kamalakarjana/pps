@@ -36,7 +36,7 @@ jobs:
       - name: Terraform Init
         run: |
           cd infrastructure
-          terraform init \
+          terraform init -reconfigure \
             -backend-config="resource_group_name=rg-lbg-demo-dev" \
             -backend-config="storage_account_name=tfstatestorageacc2b22" \
             -backend-config="container_name=lbg-02-12-1994" \
@@ -46,6 +46,33 @@ jobs:
           ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
           ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+
+      - name: Import Existing Resources
+        run: |
+          cd infrastructure
+          
+          # Function to import resource with error handling
+          import_resource() {
+            echo "Importing $1..."
+            terraform import $2 $3 || echo "⚠️  Import failed for $1 (may not exist or already imported)"
+          }
+          
+          # Import all resources (continue on error for each)
+          import_resource "Resource Group" "azurerm_resource_group.main" "/subscriptions/$AZURE_SUBSCRIPTION_ID/resourceGroups/rg-lbg-demo-dev"
+          import_resource "Container Registry" "azurerm_container_registry.main" "/subscriptions/$AZURE_SUBSCRIPTION_ID/resourceGroups/rg-lbg-demo-dev/providers/Microsoft.ContainerRegistry/registries/$ACR_NAME"
+          import_resource "Virtual Network" "azurerm_virtual_network.main" "/subscriptions/$AZURE_SUBSCRIPTION_ID/resourceGroups/rg-lbg-demo-dev/providers/Microsoft.Network/virtualNetworks/vnet-dev-lbg-app"
+          import_resource "Subnet" "azurerm_subnet.aks" "/subscriptions/$AZURE_SUBSCRIPTION_ID/resourceGroups/rg-lbg-demo-dev/providers/Microsoft.Network/virtualNetworks/vnet-dev-lbg-app/subnets/aks-subnet"
+          import_resource "AKS Cluster" "azurerm_kubernetes_cluster.main" "/subscriptions/$AZURE_SUBSCRIPTION_ID/resourceGroups/rg-lbg-demo-dev/providers/Microsoft.ContainerService/managedClusters/lbg-aks-cluster-dev"
+          import_resource "Public IP" "azurerm_public_ip.pip" "/subscriptions/$AZURE_SUBSCRIPTION_ID/resourceGroups/rg-lbg-demo-dev/providers/Microsoft.Network/publicIPAddresses/pip-lb-dev-lbg-app"
+          
+          echo "✅ Resource import process completed"
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ACR_NAME: ${{ env.ACR_NAME }}
 
       - name: Terraform Validate
         run: |
