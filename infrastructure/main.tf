@@ -81,7 +81,7 @@ resource "azurerm_kubernetes_cluster" "main" {
 
   default_node_pool {
     name                = "default"
-    node_count          = 2
+    # Remove node_count when enable_auto_scaling is true
     vm_size             = var.vm_size
     vnet_subnet_id      = azurerm_subnet.aks.id
     type                = "VirtualMachineScaleSets"
