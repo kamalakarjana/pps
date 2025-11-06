@@ -171,7 +171,7 @@ jobs:
         with:
           image-ref: '${{ env.ACR_NAME }}.azurecr.io/${{ matrix.service }}:${{ github.sha }}'
           format: 'table'
-          severity: 'CRITICAL'  # CHANGED: Only fail on CRITICAL, allow HIGH
+          severity: 'CRITICAL'  # Only fail on CRITICAL, allow HIGH
           exit-code: 1
 
       - name: Upload Trivy results as artifact
@@ -267,29 +267,63 @@ jobs:
           echo "External IP: $EXTERNAL_IP"
           echo "external_ip=$EXTERNAL_IP" >> $GITHUB_ENV
 
-      - name: Handle existing namespace
+      - name: Comprehensive namespace handling
         run: |
-          # Check if namespace exists
+          echo "=== Comprehensive Namespace Management ==="
+          
+          # Ensure we have fresh AKS credentials
+          az aks get-credentials \
+            --resource-group rg-lbg-demo-dev \
+            --name lbg-aks-cluster-dev \
+            --overwrite-existing
+          
+          # Check current context
+          kubectl config current-context
+          
+          # Clean up any existing namespace
           if kubectl get namespace lbg-ns >/dev/null 2>&1; then
-            echo "Namespace lbg-ns exists, deleting for clean installation..."
-            kubectl delete namespace lbg-ns
-            echo "Waiting for namespace to be deleted..."
-            sleep 30
-            # Verify deletion
-            until ! kubectl get namespace lbg-ns >/dev/null 2>&1; do
-              echo "Waiting for namespace deletion to complete..."
-              sleep 10
+            echo "Deleting existing namespace lbg-ns..."
+            
+            # Remove finalizers if stuck
+            kubectl get namespace lbg-ns -o json | \
+              jq '.spec.finalizers = []' | \
+              kubectl replace --raw "/api/v1/namespaces/lbg-ns/finalize" -f - || true
+            
+            # Force delete
+            kubectl delete namespace lbg-ns --force --grace-period=0 --ignore-not-found=true
+            
+            # Wait for deletion
+            for i in {1..12}; do
+              if ! kubectl get namespace lbg-ns >/dev/null 2>&1; then
+                echo "Namespace successfully deleted"
+                break
+              fi
+              echo "Waiting for namespace deletion... ($i/12)"
+              sleep 5
             done
-            echo "Namespace lbg-ns successfully deleted"
-          else
-            echo "Namespace lbg-ns does not exist, it will be created by Helm"
           fi
+          
+          # Create fresh namespace
+          echo "Creating fresh namespace lbg-ns..."
+          kubectl create namespace lbg-ns
+
+      - name: Create ACR pull secret using admin credentials
+        run: |
+          # Create or update ACR secret using admin credentials
+          kubectl create secret docker-registry acr-secret \
+            --namespace lbg-ns \
+            --docker-server=${{ env.ACR_NAME }}.azurecr.io \
+            --docker-username=${{ steps.get_acr_credentials.outputs.acr_username }} \
+            --docker-password=${{ steps.get_acr_credentials.outputs.acr_password }} \
+            --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Deploy to AKS using Helm
         run: |
           cd kubernetes/helm
           
-          # Template test first
+          echo "=== Helm Deployment ==="
+          
+          # Template for verification
           helm template lbg-app . \
             --namespace lbg-ns \
             -f values-dev.yml \
@@ -297,17 +331,18 @@ jobs:
             --set appointmentService.tag=${{ github.sha }} \
             --set image.registry=${{ env.ACR_NAME }}.azurecr.io
           
-          # Install/Upgrade the release
+          # Install/Upgrade (without --create-namespace since we created it manually)
           helm upgrade --install lbg-app . \
             --namespace lbg-ns \
-            --create-namespace \
             --wait \
-            --timeout 15m \
+            --timeout 20m \
             -f values-dev.yml \
             --set patientService.tag=${{ github.sha }} \
             --set appointmentService.tag=${{ github.sha }} \
             --set image.registry=${{ env.ACR_NAME }}.azurecr.io \
             --atomic
+          
+          echo "Helm deployment completed successfully"
 
       - name: Verify deployment
         run: |
