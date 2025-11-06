@@ -267,12 +267,33 @@ jobs:
           echo "External IP: $EXTERNAL_IP"
           echo "external_ip=$EXTERNAL_IP" >> $GITHUB_ENV
 
-      - name: Simple namespace check
+      - name: Comprehensive namespace management
         run: |
-          echo "=== Quick Namespace Check ==="
-          # Just attempt to delete if exists, ignore errors
-          kubectl delete namespace lbg-ns --ignore-not-found=true || true
-          echo "Namespace check completed"
+          echo "=== Namespace Management ==="
+          
+          # Force delete any existing namespace
+          echo "Cleaning up existing namespace..."
+          kubectl delete namespace lbg-ns --force --grace-period=0 --ignore-not-found=true || true
+          sleep 30
+          
+          # Create namespace manually
+          echo "Creating namespace lbg-ns..."
+          kubectl create namespace lbg-ns
+          
+          # Verify namespace creation
+          echo "Verifying namespace..."
+          kubectl get namespace lbg-ns
+          echo "✅ Namespace lbg-ns ready"
+
+      - name: Create ACR pull secret
+        run: |
+          # Create ACR secret after namespace is created
+          kubectl create secret docker-registry acr-secret \
+            --namespace lbg-ns \
+            --docker-server=${{ env.ACR_NAME }}.azurecr.io \
+            --docker-username=${{ steps.get_acr_credentials.outputs.acr_username }} \
+            --docker-password=${{ steps.get_acr_credentials.outputs.acr_password }} \
+            --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Deploy to AKS using Helm
         run: |
@@ -288,10 +309,9 @@ jobs:
             --set appointmentService.tag=${{ github.sha }} \
             --set image.registry=${{ env.ACR_NAME }}.azurecr.io
           
-          # Install/Upgrade with --create-namespace
+          # Install/Upgrade WITHOUT --create-namespace (namespace is already created)
           helm upgrade --install lbg-app . \
             --namespace lbg-ns \
-            --create-namespace \
             --wait \
             --timeout 20m \
             -f values-dev.yml \
@@ -301,16 +321,6 @@ jobs:
             --atomic
           
           echo "Helm deployment completed successfully"
-
-      - name: Create ACR pull secret
-        run: |
-          # Create ACR secret after Helm deployment
-          kubectl create secret docker-registry acr-secret \
-            --namespace lbg-ns \
-            --docker-server=${{ env.ACR_NAME }}.azurecr.io \
-            --docker-username=${{ steps.get_acr_credentials.outputs.acr_username }} \
-            --docker-password=${{ steps.get_acr_credentials.outputs.acr_password }} \
-            --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Verify deployment
         run: |
