@@ -267,9 +267,9 @@ jobs:
           echo "External IP: $EXTERNAL_IP"
           echo "external_ip=$EXTERNAL_IP" >> $GITHUB_ENV
 
-      - name: Comprehensive namespace handling
+      - name: Comprehensive namespace cleanup
         run: |
-          echo "=== Comprehensive Namespace Management ==="
+          echo "=== Comprehensive Namespace Cleanup ==="
           
           # Ensure we have fresh AKS credentials
           az aks get-credentials \
@@ -303,13 +303,13 @@ jobs:
             done
           fi
           
-          # Create fresh namespace
-          echo "Creating fresh namespace lbg-ns..."
-          kubectl create namespace lbg-ns
+          # DO NOT create namespace here - let Helm create it
+          echo "Namespace will be created by Helm"
 
       - name: Create ACR pull secret using admin credentials
         run: |
           # Create or update ACR secret using admin credentials
+          # This will be applied after Helm creates the namespace
           kubectl create secret docker-registry acr-secret \
             --namespace lbg-ns \
             --docker-server=${{ env.ACR_NAME }}.azurecr.io \
@@ -331,9 +331,10 @@ jobs:
             --set appointmentService.tag=${{ github.sha }} \
             --set image.registry=${{ env.ACR_NAME }}.azurecr.io
           
-          # Install/Upgrade (without --create-namespace since we created it manually)
+          # Install/Upgrade with --create-namespace so Helm owns it
           helm upgrade --install lbg-app . \
             --namespace lbg-ns \
+            --create-namespace \
             --wait \
             --timeout 20m \
             -f values-dev.yml \
