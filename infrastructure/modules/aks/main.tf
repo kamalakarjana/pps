@@ -3,10 +3,11 @@ resource "azurerm_kubernetes_cluster" "main" {
   location            = var.location
   resource_group_name = var.resource_group_name
   dns_prefix          = "${var.aks_cluster_name}-${var.environment}"
-  kubernetes_version  = var.kubernetes_version  # Use variable instead of hardcoded value
+  kubernetes_version  = var.kubernetes_version
 
   default_node_pool {
     name                = "default"
+    node_count          = 2  # Initial count
     vm_size             = var.vm_size
     vnet_subnet_id      = var.subnet_id
     type                = "VirtualMachineScaleSets"
@@ -39,11 +40,4 @@ resource "azurerm_role_assignment" "aks_acr" {
   role_definition_name             = "AcrPull"
   scope                            = var.acr_id
   skip_service_principal_aad_check = true
-}
-
-# Output for kubeconfig
-resource "local_file" "kubeconfig" {
-  count    = var.environment == "dev" ? 1 : 0
-  filename = "${path.root}/kubeconfig-${var.environment}"
-  content  = azurerm_kubernetes_cluster.main.kube_config_raw
 }

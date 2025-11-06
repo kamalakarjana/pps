@@ -4,12 +4,6 @@ variable "resource_group_name" {
   default     = "rg-lbg-demo-dev"
 }
 
-variable "azurerm_kubernetes_cluster" {
-  description = "The name of the resource group"
-  type        = string
-  default     = "lgb-aks-cluster"
-}
-
 variable "location" {
   description = "The Azure region to deploy to"
   type        = string
@@ -28,13 +22,13 @@ variable "environment" {
 variable "acr_name" {
   description = "The name of the Azure Container Registry"
   type        = string
-  default     = "acrlbgdemodev"
+  default     = "acrlbgdemodev2025"
 }
 
 variable "aks_cluster_name" {
   description = "The name of the AKS cluster"
   type        = string
-  default     = "lgb-aks-cluster"
+  default     = "lbg-aks-cluster"
 }
 
 variable "vnet_name" {
@@ -46,13 +40,7 @@ variable "vnet_name" {
 variable "public_ip_name" {
   description = "The name of the public IP address for the load balancer"
   type        = string
-  default     = "lbg-dev-lbg-app"
-}
-
-variable "node_count" {
-  description = "The number of nodes in the AKS cluster"
-  type        = number
-  default     = 2
+  default     = "pip-lb-dev-lbg-app"
 }
 
 variable "vm_size" {
@@ -65,18 +53,6 @@ variable "kubernetes_version" {
   description = "The Kubernetes version"
   type        = string
   default     = "1.33.3"
-}
-
-variable "service_cidr" {
-  description = "The network range used by the Kubernetes service"
-  type        = string
-  default     = "10.0.2.0/24"
-}
-
-variable "dns_service_ip" {
-  description = "IP address within the Kubernetes service address range that will be used by cluster service discovery"
-  type        = string
-  default     = "10.0.2.10"
 }
 
 variable "min_count" {

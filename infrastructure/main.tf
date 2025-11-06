@@ -2,7 +2,7 @@ terraform {
   required_version = ">= 1.0"
   backend "azurerm" {
     resource_group_name  = "rg-lbg-demo-dev"
-    storage_account_name = "tfstatestorageacc0212"
+    storage_account_name = "tfstatestorageacc2b22"
     container_name       = "lbg-02-12-1994"
     key                  = "terraform.lbg-02-12-1994"
   }
@@ -27,59 +27,56 @@ provider "azurerm" {
   features {}
 }
 
-# Resource Group
-module "resource_group" {
-  source = "./modules/resource-group"
-
-  resource_group_name = var.resource_group_name
-  location            = var.location
-  environment         = var.environment
+# Data sources for existing resources
+data "azurerm_resource_group" "existing" {
+  name = "rg-lbg-demo-dev"
 }
 
-# Container Registry
-module "acr" {
-  source = "./modules/acr"
-
-  resource_group_name = module.resource_group.name
-  location            = module.resource_group.location
-  acr_name            = var.acr_name
-  environment         = var.environment
+data "azurerm_storage_account" "existing" {
+  name                = "tfstatestorageacc2b22"
+  resource_group_name = data.azurerm_resource_group.existing.name
 }
 
-# Network
+data "azurerm_container_registry" "existing" {
+  name                = "acrlbgdemodev2025"
+  resource_group_name = data.azurerm_resource_group.existing.name
+}
+
+# Network - Create new VNet
 module "network" {
   source = "./modules/network"
 
-  resource_group_name = module.resource_group.name
-  location            = module.resource_group.location
+  resource_group_name = data.azurerm_resource_group.existing.name
+  location            = data.azurerm_resource_group.existing.location
   vnet_name           = var.vnet_name
   environment         = var.environment
 }
 
-# AKS Cluster
+# AKS Cluster - Create new cluster
 module "aks" {
   source = "./modules/aks"
 
-  resource_group_name = module.resource_group.name
-  location            = module.resource_group.location
+  resource_group_name = data.azurerm_resource_group.existing.name
+  location            = data.azurerm_resource_group.existing.location
   aks_cluster_name    = var.aks_cluster_name
   vnet_id             = module.network.vnet_id
   subnet_id           = module.network.aks_subnet_id
-  acr_id              = module.acr.id
+  acr_id              = data.azurerm_container_registry.existing.id
   environment         = var.environment
-  node_count          = var.node_count
   vm_size             = var.vm_size
   kubernetes_version  = var.kubernetes_version
+  min_count           = var.min_count
+  max_count           = var.max_count
 }
 
 # Public IP for Load Balancer
 resource "azurerm_public_ip" "pip" {
   name                = var.public_ip_name
-  location            = module.resource_group.location
-  resource_group_name = module.resource_group.name
+  location            = data.azurerm_resource_group.existing.location
+  resource_group_name = data.azurerm_resource_group.existing.name
   allocation_method   = "Static"
   sku                 = "Standard"
-  domain_name_label   = "${var.environment}-lbg-ns"
+  domain_name_label   = "${var.environment}-lbg-app"
 
   tags = {
     environment = var.environment
