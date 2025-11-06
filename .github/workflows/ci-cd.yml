@@ -267,55 +267,29 @@ jobs:
           echo "External IP: $EXTERNAL_IP"
           echo "external_ip=$EXTERNAL_IP" >> $GITHUB_ENV
 
-      - name: Comprehensive namespace cleanup
+      - name: Force namespace cleanup
         run: |
-          echo "=== Comprehensive Namespace Cleanup ==="
+          echo "=== Force Namespace Cleanup ==="
           
-          # Ensure we have fresh AKS credentials
+          # Get fresh credentials
           az aks get-credentials \
             --resource-group rg-lbg-demo-dev \
             --name lbg-aks-cluster-dev \
             --overwrite-existing
           
-          # Check current context
-          kubectl config current-context
+          # Force delete namespace
+          echo "Force deleting namespace lbg-ns..."
+          kubectl delete namespace lbg-ns --force --grace-period=0 --ignore-not-found=true || true
           
-          # Clean up any existing namespace
+          # Wait and verify
+          sleep 30
           if kubectl get namespace lbg-ns >/dev/null 2>&1; then
-            echo "Deleting existing namespace lbg-ns..."
-            
-            # Remove finalizers if stuck
-            kubectl get namespace lbg-ns -o json | \
-              jq '.spec.finalizers = []' | \
-              kubectl replace --raw "/api/v1/namespaces/lbg-ns/finalize" -f - || true
-            
-            # Force delete
-            kubectl delete namespace lbg-ns --force --grace-period=0 --ignore-not-found=true
-            
-            # Wait for deletion
-            for i in {1..12}; do
-              if ! kubectl get namespace lbg-ns >/dev/null 2>&1; then
-                echo "Namespace successfully deleted"
-                break
-              fi
-              echo "Waiting for namespace deletion... ($i/12)"
-              sleep 5
-            done
+            echo "❌ ERROR: Namespace lbg-ns still exists after force deletion"
+            echo "This indicates a serious issue with the namespace."
+            exit 1
+          else
+            echo "✅ Namespace lbg-ns successfully deleted"
           fi
-          
-          # DO NOT create namespace here - let Helm create it
-          echo "Namespace will be created by Helm"
-
-      - name: Create ACR pull secret using admin credentials
-        run: |
-          # Create or update ACR secret using admin credentials
-          # This will be applied after Helm creates the namespace
-          kubectl create secret docker-registry acr-secret \
-            --namespace lbg-ns \
-            --docker-server=${{ env.ACR_NAME }}.azurecr.io \
-            --docker-username=${{ steps.get_acr_credentials.outputs.acr_username }} \
-            --docker-password=${{ steps.get_acr_credentials.outputs.acr_password }} \
-            --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Deploy to AKS using Helm
         run: |
@@ -331,7 +305,7 @@ jobs:
             --set appointmentService.tag=${{ github.sha }} \
             --set image.registry=${{ env.ACR_NAME }}.azurecr.io
           
-          # Install/Upgrade with --create-namespace so Helm owns it
+          # Install/Upgrade with --create-namespace
           helm upgrade --install lbg-app . \
             --namespace lbg-ns \
             --create-namespace \
@@ -344,6 +318,16 @@ jobs:
             --atomic
           
           echo "Helm deployment completed successfully"
+
+      - name: Create ACR pull secret
+        run: |
+          # Create ACR secret after Helm deployment
+          kubectl create secret docker-registry acr-secret \
+            --namespace lbg-ns \
+            --docker-server=${{ env.ACR_NAME }}.azurecr.io \
+            --docker-username=${{ steps.get_acr_credentials.outputs.acr_username }} \
+            --docker-password=${{ steps.get_acr_credentials.outputs.acr_password }} \
+            --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Verify deployment
         run: |
