@@ -280,6 +280,12 @@ jobs:
             --docker-password=${{ steps.get_acr_credentials.outputs.acr_password }} \
             --dry-run=client -o yaml | kubectl apply -f -
 
+      - name: Debug Ingress Status Before Deploy
+        run: |
+          echo "=== Checking Current Ingress Status ==="
+          kubectl get ingress -A
+          kubectl get ingressclass
+
       - name: Deploy to AKS using Helm
         run: |
           cd kubernetes/helm
@@ -324,6 +330,16 @@ jobs:
           kubectl get endpoints -n lbg-ns
           kubectl describe svc patient-service -n lbg-ns
           kubectl describe svc appointment-service -n lbg-ns
+
+      - name: Debug Ingress Configuration
+        run: |
+          echo "=== Ingress Debug Information ==="
+          kubectl get ingress -n lbg-ns -o wide
+          kubectl describe ingress lbg-app-ingress -n lbg-ns
+          
+          # Check nginx configuration
+          echo "=== Nginx Ingress Logs ==="
+          kubectl logs -n ingress-nginx -l app.kubernetes.io/name=ingress-nginx --tail=20
 
       - name: Get Browser Access URLs
         run: |
