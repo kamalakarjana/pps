@@ -1,7 +1,7 @@
 global:
-  namespace: lbg-ns
   environment: dev
-  
+  namespace: lbg-ns
+
 image:
   registry: acrlbgdemodev2025.azurecr.io
   pullPolicy: IfNotPresent
@@ -15,16 +15,11 @@ patientService:
   serviceType: ClusterIP
   resources:
     requests:
-      memory: "64Mi"
-      cpu: "50m"
-    limits:
       memory: "128Mi"
       cpu: "100m"
-  hpa:
-    minReplicas: 1
-    maxReplicas: 5
-    targetCPU: 50
-    targetMemory: 70
+    limits:
+      memory: "256Mi"
+      cpu: "200m"
 
 appointmentService:
   name: appointment-service
@@ -35,32 +30,12 @@ appointmentService:
   serviceType: ClusterIP
   resources:
     requests:
-      memory: "64Mi"
-      cpu: "50m"
-    limits:
       memory: "128Mi"
       cpu: "100m"
-  hpa:
-    minReplicas: 1
-    maxReplicas: 5
-    targetCPU: 50
-    targetMemory: 70
+    limits:
+      memory: "256Mi"
+      cpu: "200m"
 
 ingress:
   enabled: true
   className: "nginx"
-  annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
-    nginx.ingress.kubernetes.io/ssl-redirect: "false"
-  hosts:
-    - host: lbg-app.dev.local
-      paths:
-        - path: /
-          pathType: Prefix
-        - path: /patients
-          pathType: Prefix
-        - path: /appointments
-          pathType: Prefix
-
-persistence:
-  enabled: false

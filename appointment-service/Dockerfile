@@ -1,4 +1,3 @@
-# ✅ FIXED (Latest stable)
 FROM node:18-alpine3.20
 
 # Install curl for health checks
