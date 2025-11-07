@@ -39,3 +39,6 @@ appointmentService:
 ingress:
   enabled: true
   className: "nginx"
+
+persistence:
+  enabled: false
