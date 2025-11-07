@@ -1,45 +1,42 @@
-{{- if .Values.ingress.enabled }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: lbg-app-ingress
   namespace: {{ .Values.global.namespace }}
   annotations:
-    {{- range $key, $value := .Values.ingress.annotations }}
-    {{ $key }}: {{ $value | quote }}
-    {{- end }}
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
 spec:
-  ingressClassName: {{ .Values.ingress.className }}
+  ingressClassName: nginx
   rules:
-    - host: {{ index .Values.ingress.hosts 0 }.host | quote }}
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: {{ .Values.patientService.name }}
-                port:
-                  number: {{ .Values.patientService.port }}
-          - path: /health
-            pathType: Prefix
-            backend:
-              service:
-                name: {{ .Values.patientService.name }}
-                port:
-                  number: {{ .Values.patientService.port }}
-          - path: /appointments
-            pathType: Prefix
-            backend:
-              service:
-                name: {{ .Values.appointmentService.name }}
-                port:
-                  number: {{ .Values.appointmentService.port }}
-          - path: /patients
-            pathType: Prefix
-            backend:
-              service:
-                name: {{ .Values.patientService.name }}
-                port:
-                  number: {{ .Values.patientService.port }}
-{{- end }}
+  - host: lbg-app.dev.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ .Values.patientService.name }}
+            port:
+              number: {{ .Values.patientService.port }}
+      - path: /health
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ .Values.patientService.name }}
+            port:
+              number: {{ .Values.patientService.port }}
+      - path: /patients
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ .Values.patientService.name }}
+            port:
+              number: {{ .Values.patientService.port }}
+      - path: /appointments
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ .Values.appointmentService.name }}
+            port:
+              number: {{ .Values.appointmentService.port }}

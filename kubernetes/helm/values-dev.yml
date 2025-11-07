@@ -20,11 +20,6 @@ patientService:
     limits:
       memory: "256Mi"
       cpu: "200m"
-  hpa:
-    minReplicas: 1
-    maxReplicas: 5
-    targetCPU: 50
-    targetMemory: 70
 
 appointmentService:
   name: appointment-service
@@ -40,24 +35,7 @@ appointmentService:
     limits:
       memory: "256Mi"
       cpu: "200m"
-  hpa:
-    minReplicas: 1
-    maxReplicas: 5
-    targetCPU: 50
-    targetMemory: 70
 
 ingress:
   enabled: true
   className: "nginx"
-  annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
-    nginx.ingress.kubernetes.io/ssl-redirect: "false"
-    nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "30"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "30"
-  hosts:
-    - host: lbg-app.dev.local
-      paths: []
-
-persistence:
-  enabled: false
