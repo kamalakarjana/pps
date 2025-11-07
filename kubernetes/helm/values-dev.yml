@@ -15,11 +15,11 @@ patientService:
   serviceType: ClusterIP
   resources:
     requests:
-      memory: "64Mi"
-      cpu: "50m"
-    limits:
       memory: "128Mi"
       cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "200m"
   hpa:
     minReplicas: 1
     maxReplicas: 5
@@ -35,11 +35,11 @@ appointmentService:
   serviceType: ClusterIP
   resources:
     requests:
-      memory: "64Mi"
-      cpu: "50m"
-    limits:
       memory: "128Mi"
       cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "200m"
   hpa:
     minReplicas: 1
     maxReplicas: 5
@@ -57,13 +57,7 @@ ingress:
     nginx.ingress.kubernetes.io/proxy-read-timeout: "30"
   hosts:
     - host: lbg-app.dev.local
-      paths:
-        - path: /
-          pathType: Prefix
-        - path: /patients
-          pathType: Prefix
-        - path: /appointments
-          pathType: Prefix
+      paths: []
 
 persistence:
   enabled: false

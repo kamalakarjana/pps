@@ -227,6 +227,13 @@ jobs:
           kubectl config current-context
           kubectl get nodes
 
+      - name: Debug Cluster Info
+        run: |
+          echo "=== Cluster Information ==="
+          kubectl cluster-info
+          kubectl get namespaces
+          kubectl get pods --all-namespaces
+
       - name: Get ACR Admin Credentials
         id: get_acr_credentials
         run: |
@@ -305,6 +312,15 @@ jobs:
           echo "=== Deployment Verification ==="
           kubectl get all -n lbg-ns
           kubectl get ingress -n lbg-ns
+          kubectl describe ingress lbg-app-ingress -n lbg-ns
+
+      - name: Debug Services and Endpoints
+        run: |
+          echo "=== Services and Endpoints ==="
+          kubectl get svc -n lbg-ns
+          kubectl get endpoints -n lbg-ns
+          kubectl describe svc patient-service -n lbg-ns
+          kubectl describe svc appointment-service -n lbg-ns
 
       - name: Get Browser Access URLs
         run: |
@@ -337,6 +353,7 @@ jobs:
           echo "External IP: $EXTERNAL_IP"
           
           # Wait for ingress
+          echo "Waiting for ingress to be ready..."
           sleep 30
           
           # Test applications inside pods first
@@ -344,25 +361,49 @@ jobs:
           kubectl exec -n lbg-ns deployment/patient-service -- curl -s http://localhost:3000/health && echo "✅ Patient service internal: OK" || echo "❌ Patient service internal: FAILED"
           kubectl exec -n lbg-ns deployment/appointment-service -- curl -s http://localhost:3001/health && echo "✅ Appointment service internal: OK" || echo "❌ Appointment service internal: FAILED"
           
-          # Test through ingress
-          echo "Testing through ingress..."
-          if curl -s -f -m 10 -H "Host: lbg-app.dev.local" http://$EXTERNAL_IP/health; then
-            echo "✅ Health check: SUCCESS"
-          else
-            echo "❌ Health check: FAILED"
-          fi
+          # Test through ingress with retries
+          echo "Testing through ingress (with retries)..."
+          for i in {1..10}; do
+            echo "Attempt $i: Testing ingress routes..."
+            
+            if curl -s -f -m 10 -H "Host: lbg-app.dev.local" http://$EXTERNAL_IP/health > /dev/null; then
+              echo "✅ Health check: SUCCESS"
+              HEALTH_SUCCESS=true
+            else
+              echo "❌ Health check: FAILED on attempt $i"
+              HEALTH_SUCCESS=false
+            fi
+            
+            if curl -s -f -m 10 -H "Host: lbg-app.dev.local" http://$EXTERNAL_IP/ > /dev/null; then
+              echo "✅ Root endpoint: SUCCESS"
+              ROOT_SUCCESS=true
+            else
+              echo "❌ Root endpoint: FAILED on attempt $i"
+              ROOT_SUCCESS=false
+            fi
+            
+            if curl -s -f -m 10 -H "Host: lbg-app.dev.local" http://$EXTERNAL_IP/appointments > /dev/null; then
+              echo "✅ Appointments endpoint: SUCCESS"
+              APPOINTMENT_SUCCESS=true
+            else
+              echo "❌ Appointments endpoint: FAILED on attempt $i"
+              APPOINTMENT_SUCCESS=false
+            fi
+            
+            if [ "$HEALTH_SUCCESS" = true ] && [ "$ROOT_SUCCESS" = true ] && [ "$APPOINTMENT_SUCCESS" = true ]; then
+              echo "🎉 All endpoints are working!"
+              break
+            else
+              echo "Some endpoints failed, retrying in 10 seconds..."
+              sleep 10
+            fi
+          done
           
-          if curl -s -f -m 10 -H "Host: lbg-app.dev.local" http://$EXTERNAL_IP/; then
-            echo "✅ Root endpoint: SUCCESS"
-          else
-            echo "❌ Root endpoint: FAILED"
-          fi
-          
-          if curl -s -f -m 10 -H "Host: lbg-app.dev.local" http://$EXTERNAL_IP/appointments; then
-            echo "✅ Appointments endpoint: SUCCESS"
-          else
-            echo "❌ Appointments endpoint: FAILED"
-          fi
+          # Final verbose test
+          echo "=== Final Verbose Tests ==="
+          curl -v -H "Host: lbg-app.dev.local" http://$EXTERNAL_IP/health
+          curl -v -H "Host: lbg-app.dev.local" http://$EXTERNAL_IP/
+          curl -v -H "Host: lbg-app.dev.local" http://$EXTERNAL_IP/appointments
 
   cleanup:
     runs-on: ubuntu-latest
