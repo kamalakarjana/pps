@@ -10,7 +10,7 @@ resources:
  
 variables:
   # Container registry service connection established during pipeline creation
-  dockerRegistryServiceConnection: '2b430c07-159c-4ca3-94f3-5a731433a1fa'
+  dockerRegistryServiceConnection: 'af33ef1d-2213-4f87-ac07-eaf0561b4393'
   imageRepository: 'acrlbgdemodev'
   containerRegistry: 'acrlbgdemodev.azurecr.io'
   dockerfilePath: '$(Build.SourcesDirectory)/patient-service/Dockerfile'
