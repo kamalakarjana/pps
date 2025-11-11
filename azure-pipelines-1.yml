@@ -1,0 +1,5 @@
+pool:
+  name: Default
+steps:
+  - script: docker ps
+    displayName: "Check Docker access"
