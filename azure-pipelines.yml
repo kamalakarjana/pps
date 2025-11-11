@@ -14,7 +14,7 @@ variables:
   dockerRegistryServiceConnection: 'af33ef1d-2213-4f87-ac07-eaf0561b4393'
   imageRepository: 'acrlbgdemodev'
   containerRegistry: 'acrlbgdemodev.azurecr.io'
-  dockerfilePath: '/patient-service/Dockerfile'
+  dockerfilePath: 'patient-service/Dockerfile'
   tag: '$(Build.BuildId)'
  
   # Agent VM image name
