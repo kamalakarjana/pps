@@ -1,0 +1,134 @@
+Harness Interview Questions (Module-wise)
+1. Harness Continuous Integration (CI)
+Basic
+•	What is Harness CI and how is it different from traditional Jenkins pipelines?
+•	Explain the architecture of Harness CI (Delegate, Worker nodes, Containers, etc.).
+•	What are Build Stages and Build Infrastructure in Harness CI?
+Intermediate
+•	How does Harness CI optimize caching (module caching, Docker layer caching)?
+•	What are Input Sets in Harness CI and when do you use them?
+•	How do you securely store and reference secrets in Harness CI?
+•	Explain how to run parallel steps in a CI pipeline.
+Advanced / Scenario
+•	Your CI builds are slow—how do you troubleshoot and optimize them in Harness?
+•	You want to trigger builds for only specific branches. How do you configure this?
+•	Build is failing only in GitHub PR triggers but not in manual runs—how would you debug?
+•	Explain how Harness CI integrates with Docker Hub, GitHub Container Registry, JFrog.
+2. Harness Continuous Delivery (CD) & GitOps
+Basic
+•	What is the role of a Harness Delegate in the CD pipeline?
+•	Explain Services, Environments, and Infrastructure Definitions.
+•	What is a Deployment Template?
+Intermediate
+•	What is the difference between Rolling, Blue-Green, and Canary Deployments in Harness?
+•	How does Harness GitOps differ from ArgoCD?
+•	What are GitOps Agents? How do they communicate?
+Advanced / Scenario
+•	A deployment is stuck in “Waiting for Approval.” How do you fix it?
+•	Canary deployment is failing on step-2 verification—how do you debug?
+•	Your GitOps agent shows “Out of Sync” but manifests are correct—what could be wrong?
+•	How do you perform rollback automatically in Harness CD?
+3. Harness Internal Developer Portal (IDP)
+Basic
+•	What is Harness IDP, and why do organizations use it?
+•	What is the Backstage Plugin in Harness IDP?
+Intermediate
+•	How do you onboard an application to Harness IDP?
+•	What are Developer Self-Service templates?
+•	How do Scorecards work in IDP?
+Advanced / Scenario
+•	Your developers complain that IDP catalog entities are not syncing. How do you fix?
+•	How do you manage golden-templates for Kubernetes microservices using IDP?
+•	How do you enforce governance using Scorecards?
+
+4. Harness Infrastructure as Code Management (IACM)
+Basic
+•	What is IACM in Harness?
+•	How does Harness IACM differ from Terraform Cloud?
+Intermediate
+•	What are Workspaces and IACM Pipelines?
+•	How does state management work in Harness IACM?
+•	How do you integrate IACM with secret managers?
+Advanced / Scenario
+•	Apply is failing due to state lock—how do you resolve it?
+•	How do you configure drift detection in IACM?
+•	How would you migrate existing Terraform code into IACM?
+5. Harness Software Engineering Insights (SEI)
+Basic
+•	What is SEI in Harness?
+•	How does SEI collect data from Git providers?
+Intermediate
+•	What are DORA Metrics? How does Harness calculate them?
+•	What dashboards are available in SEI?
+•	How does SEI track MTTR, Change Failure Rate, Lead Time?
+Advanced / Scenario
+•	Deployment frequency dropped suddenly—how would you investigate in SEI?
+•	SEI is not collecting PR metrics—what do you check?
+•	How to set up custom engineering KPIs in Harness SEI?
+6. Harness Chaos Engineering
+Basic
+•	What is Chaos Engineering? Why is it important?
+•	What are Chaos Experiments in Harness?
+Intermediate
+•	Explain steady-state hypothesis.
+•	What are the common chaos faults available in Harness (CPU hog, Pod delete, Network latency)?
+•	How do you integrate Harness Chaos with CD pipelines?
+Advanced / Scenario
+•	Pod-delete chaos is not affecting the target pod—what might be wrong?
+•	How do you run automated chaos during canary deployment?
+•	How would you measure SLO impact using Chaos + SEI or Chaos + SRM?
+======================================================================
+SET – 2: Advanced + Scenario + Real-World Questions
+1. Harness Continuous Integration (CI)
+•	How do you handle monorepo builds with Harness CI?
+•	Explain the difference between Hosted and Self-Managed Build Infrastructures.
+•	How do you configure matrix builds in Harness?
+•	CI tests pass locally but fail only inside Harness CI. How do you troubleshoot?
+•	What strategies do you use to reduce pipeline execution time in Harness CI?
+•	How do you implement SBOM (Software Bill of Materials) in Harness CI?
+•	What are Cache Intelligence and Restore Cache strategies?
+2. Harness Continuous Delivery (CD) & GitOps
+•	Explain the end-to-end flow of a Harness CD pipeline using Kubernetes.
+•	What happens internally when Harness performs a Rolling Deployment?
+•	In a multi-service microservice deployment, how do you coordinate deployments?
+•	What is the difference between Kubernetes Rollout and Native Helm Deployment in Harness?
+•	How does Harness handle Artifact Promotion across environments?
+•	How do you set up multi-region blue-green deployment?
+•	What is a Freeze Window and how do you enforce it?
+GitOps-specific
+•	How would you troubleshoot GitOps webhook failure?
+•	Why is your GitOps Agent showing outdated commit SHA?
+•	Compare Harness GitOps Sync Strategy: Auto vs. Manual vs. Pipeline-driven.
+3. Harness Internal Developer Portal (IDP)
+•	How do you integrate SSO with Harness IDP?
+•	What are Catalog Entities and how do you define them?
+•	When onboarding developers, what governance rules can you enforce?
+•	How would you build a Golden Path Template for a microservice?
+•	How do you enable developer self-service for Infrastructure provisioning?
+•	How does IDP reduce cognitive load for DevOps and developers?
+4. Harness Infrastructure as Code Management (IACM)
+•	Explain a full workflow: PR → Plan → Approve → Apply in IACM.
+•	What is the difference between Remote and Local Terraform execution?
+•	How do you share Variables and Backends across Workspaces?
+•	How do you detect drift between actual infra vs Terraform?
+•	How do you ensure Terraform Apply happens only after security checks?
+•	How do you enforce policy-as-code in IACM (OPA / Sentinel-style)?
+•	Your team wants to use Terragrunt with IACM—how would you approach?
+
+5. Harness Software Engineering Insights (SEI)
+•	How does SEI calculate Change Failure Rate internally?
+•	What is the difference between Lead Time for Changes vs Lead Time for Deployments?
+•	How do you integrate Jira, GitHub, and Jenkins together into SEI?
+•	What are Productivity Insights and how are they calculated?
+•	If DORA metrics suddenly drop, what layers would you inspect in SEI?
+•	How do Service-Level Insights correlate with SLOs and incidents?
+6. Harness Chaos Engineering
+•	What is the difference between Probes and Faults in Chaos experiments?
+•	How do you run Chaos on production safely?
+•	How do you automatically rollback when Chaos experiment fails?
+•	Explain Blast Radius and its importance.
+•	How do you run Chaos as part of GitOps deployment?
+•	Why is CPU Stress chaos not generating expected failures?
+•	How do you simulate cloud-specific failures (e.g., AWS EC2 stop instance)?
+
+==================================================
